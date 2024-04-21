@@ -9,7 +9,7 @@ SerialComm::SerialComm(const char* port_name) {
     * :param port_name: the name of the serial device to write to/from        
     */        
     serial_port = open(port_name, O_RDWR | O_NOCTTY | O_NDELAY);
-
+    std::cout << serial_port << std::endl;
     // error check serial port was opened correctly
     if (serial_port < 0) {
         std::cerr <<"Error " << errno << " from opening " << port_name << std::endl;
@@ -92,9 +92,10 @@ bool SerialComm::write_data(const char* data, size_t length) {
         if (bytes_written < 0) {
             std::cerr << "Error writing data to serial port: " << errno << std::endl;
             std::cerr << strerror(errno) << std::endl;
-            return false;
+            std::cerr << serial_port << std::endl;
+            exit(-1);
         }
-        std::cout << "Wrote data to device." << std::endl;
+        //std::cout << "Wrote data to device." << std::endl;
         return true;
 }
 

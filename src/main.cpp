@@ -1,45 +1,17 @@
 #include <iostream>
 #include "../include/SerialComm.h"
+//#include "../include/ConfigManager.h"
+#include "ConfigManager.cpp"
 
 using std::string;
 
 int main()
 {
-    SerialComm serial("/dev/tty.usbserial-A10KDLKN");
-    string LOGIN = ":";
-    string BASH = "~#";
-    string response = "";
+    ConfigManager test("/dev/tty.usbserial-A10KDLKN", "test", "test");
 
-    serial.send_command("\n");
-    while (response.find(LOGIN) == string::npos) {
-        response.append(serial.read_response());
-    }
-    response.clear();
-
-    serial.send_command("root\n");
-    while (response.find(LOGIN) == string::npos) {
-        response.append(serial.read_response());
-    }
-    response.clear();
-
-    serial.send_command("temp\n");
-    while (response.find(BASH) == string::npos) {
-        response.append(serial.read_response());
-    }
-    response.clear();
-
-    serial.send_command("\n");
-    while (response.find(BASH) == string::npos) {
-        response.append(serial.read_response());
-    }
-    response.clear();
+    bool res = test.login();
+    std::cout << "Login Result: " << res << std::endl;
     
-    serial.send_command("whoami\n");
-    while (response.find(BASH) == string::npos) {
-        response.append(serial.read_response());
-    }
-    std::cout << "Response: " << response << std::endl;
-
     return 0;
 
 }
