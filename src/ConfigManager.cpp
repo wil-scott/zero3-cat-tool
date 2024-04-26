@@ -1,4 +1,5 @@
 #include "../include/SerialComm.h"
+#include <string>
 //#include "../include/ConfigManager.h"
 
 using std::string;
@@ -37,13 +38,13 @@ public:
                 continue;
             }
             std::cout << "start of passwd" << std::endl;
-            if (get_prompt(PASSWD, 100000, false, 10000)) {
+            if (get_prompt(PASSWD, 100000, false, 0)) {
                 serial.send_command("temp\n");
             } else {
                 continue;
             }
             std::cout << "start of get bash" << std::endl;
-            if (get_prompt(BASH, 100000, false, 1000)) {
+            if (get_prompt(BASH, 100000, false, 0)) {
                 return true;
             }
         }
@@ -56,7 +57,40 @@ public:
         *
         * :return: true if successful else false 
         */
+        // Format command string
+        string connect_cmd = "nmcli device wifi connect " + wifi_network + " password " + wifi_passwd + "\n";
+        string ping_cmd = "ping -c2 8.8.8.8\n";
+        string response;
+        
+        if (!get_prompt(BASH, 1000000, true, 1000)) {
+            std::cout << "Unable to configure wifi - no bash prompt found." << std::endl;
+            return false;
+        }
+        // attempt to connect
+        serial.send_command(connect_cmd.c_str());
+        if (!get_prompt("successfully activated", 1000000, false, 0)) {
+            return false;
+        } 
+        // nmcli connection successful - get bash prompt
+        if (!get_prompt(BASH, 100000, false, 0)) {
+            std::cout << "Unable to get bash prompt." << std::endl;
+            return false;
+        }
+        std::cout << "nmcli command complete - bash prompt found" << std::endl;
+        
+        // connection presumed successful - get prompt and test with ping
+        if (!get_prompt(BASH, 1000000, true, 1000)) {
+            std::cout << "Unable to get bash prompt for ping test." << std::endl;
+            return false;
+        }
+        std::cout << "Sending ping command" << std::endl;
+        serial.send_command(ping_cmd.c_str());
 
+        if (get_prompt("2 packets transmitted", 1000000, false, 0)) {
+            return true;
+        }
+
+        return false;
     }
 
     bool run_apt_update() {
