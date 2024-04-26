@@ -5,12 +5,16 @@
 
 using std::string;
 
-int main()
+int main(int argc, char* argv[])
 {
-    ConfigManager test("/dev/tty.usbserial-A10KDLKN", "test", "test");
+    string network_id = argv[1];
+    string passwd = argv[2];
+    ConfigManager test("/dev/tty.usbserial-A10KDLKN", network_id, passwd);
 
     bool res = test.login();
     std::cout << "Login Result: " << res << std::endl;
+    bool res_2 = test.configure_wifi();
+    std::cout << "Network result: " << res_2 << std::endl;
     
     return 0;
 
