@@ -110,7 +110,7 @@ bool SerialComm::read_data(char* buffer, size_t buffer_size) {
         ssize_t bytes_read = 0;
         bytes_read = read(serial_port, buffer, buffer_size);
         if (bytes_read < 0) {
-            std::cerr << "Error reading data from serial port." << std::endl;
+            //std::cerr << "Error reading data from serial port." << std::endl;
             return false;
         }
         buffer[bytes_read] = '\0';

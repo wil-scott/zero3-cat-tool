@@ -1,160 +1,160 @@
-#include "../include/SerialComm.h"
-#include <string>
-//#include "../include/ConfigManager.h"
+#include "../include/ConfigManager.h"
 
-using std::string;
+ConfigManager::ConfigManager(const string device, string wifi_network, string wifi_passwd, string root_user, string root_pass)
+    : serial(device.c_str()), wifi_network(wifi_network), wifi_passwd(wifi_passwd), root_user(root_user), root_pass(root_pass) {
+}
 
-class ConfigManager {
-private:
-    SerialComm serial;
-    string time_lag;
-    string wifi_network;
-    string wifi_passwd;
-    string sudo_package = "sudo";
-    string ntp_package = "ntp";
-    string LOGIN = "login:";
-    string PASSWD = "Password:";
-    string BASH = "~#";
-    const char interrupt_char = 0x03;
+void ConfigManager::clear_response() {
+    response.clear();
+}
 
-public:
-    ConfigManager(const string device, string wifi_network, string wifi_passwd) 
-        : serial(device.c_str()), wifi_network(wifi_network), wifi_passwd(wifi_passwd) {
-        
+string ConfigManager::extractTimeDiscrepancy(const string& response) {
+    std::regex timeReg("\\(invalid for another (\\d+)d (\\d+)h (\\d+)min (\\d+)s\\)");
+    std::smatch timeMatch;
+
+    if (std::regex_search(response, timeMatch, timeReg)) {
+        if (timeMatch.size() == 5) {
+            int days = std::stoi(timeMatch[1]);
+            int hours = std::stoi(timeMatch[2]);
+            int minutes = std::stoi(timeMatch[3]);
+            int seconds = std::stoi(timeMatch[4]);
+
+            // calculate time in seconds
+            int totalTime = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+
+            std::cout << "Total parsed time: " << totalTime << " seconds." << std::endl;
+            return std::to_string(totalTime);
+        }
     }
+    return "";
+}
 
-    bool login() {
-        /*
-        * Logs in to Zero3 over serial using default root/password values.
-        * 
-        * :return: true if login successful, else false
-        */
-        std::cout << "start of login" << std::endl;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            std::cout << "login attempt " << attempt << std::endl;
-            if (get_prompt(LOGIN, 100000, true, 10000)) {
-                serial.send_command("root\n");
-            } else {
-                continue;
-            }
-            std::cout << "start of passwd" << std::endl;
-            if (get_prompt(PASSWD, 100000, false, 0)) {
-                serial.send_command("temp\n");
-            } else {
-                continue;
-            }
-            std::cout << "start of get bash" << std::endl;
-            if (get_prompt(BASH, 100000, false, 0)) {
-                return true;
-            }
-        }
-        return false;
-    }
+bool ConfigManager::get_prompt(string prompt_type, int max_attempts, bool send_interrupt, int int_interval) {
+    response.clear();
 
-    bool configure_wifi() {
-        /*
-        * Uses the network name and password to connect to wifi.
-        *
-        * :return: true if successful else false 
-        */
-        // Format command string
-        string connect_cmd = "nmcli device wifi connect " + wifi_network + " password " + wifi_passwd + "\n";
-        string ping_cmd = "ping -c2 8.8.8.8\n";
-        string response;
-        
-        if (!get_prompt(BASH, 1000000, true, 1000)) {
-            std::cout << "Unable to configure wifi - no bash prompt found." << std::endl;
-            return false;
-        }
-        // attempt to connect
-        serial.send_command(connect_cmd.c_str());
-        if (!get_prompt("successfully activated", 1000000, false, 0)) {
-            return false;
-        } 
-        // nmcli connection successful - get bash prompt
-        if (!get_prompt(BASH, 100000, false, 0)) {
-            std::cout << "Unable to get bash prompt." << std::endl;
-            return false;
-        }
-        std::cout << "nmcli command complete - bash prompt found" << std::endl;
-        
-        // connection presumed successful - get prompt and test with ping
-        if (!get_prompt(BASH, 1000000, true, 1000)) {
-            std::cout << "Unable to get bash prompt for ping test." << std::endl;
-            return false;
-        }
-        std::cout << "Sending ping command" << std::endl;
-        serial.send_command(ping_cmd.c_str());
-
-        if (get_prompt("2 packets transmitted", 1000000, false, 0)) {
+    for (int attempts = 0; attempts < max_attempts; attempts++) {
+        response.append(serial.read_response());
+        if (response.find(prompt_type) != string::npos) {
             return true;
+        } else if (send_interrupt && attempts % int_interval == 0) {
+            std::cout << "send interrupt" << std::endl;
+            serial.send_command(&interrupt_char);
+            serial.send_command("\n");
         }
+        usleep(10);
+    }
+    return false;
+}
 
+bool ConfigManager::login() {
+    const string temp_user = root_user + "\n";
+    const string temp_pass = root_pass + "\n";
+
+    if (get_prompt(LOGIN, 100000, true, 10000)) {
+        serial.send_command(temp_user.c_str());
+    } else {
         return false;
     }
-
-    bool run_apt_update() {
-
-    }
-
-    bool run_apt_upgrade() {
-
-    }
-
-    bool run_apt_install(string package) {
-
-    }
-
-    bool get_clock_discrepancy() {
-
-    }
-
-    bool fix_clock() {
-
-    }
-
-    bool create_user() {
-
-    }
-private:
-    string get_output() {
-        /*
-        * 
-        * 
-        * 
-        */
-        string response;
-        
-    }
-
-    bool get_prompt(string prompt_type, int max_attempts, bool send_interrupt, int int_interval) {
-        /*
-        * Reads serial output until the prompt is found or max attempts is reached.
-        * 
-        * :param prompt_type: a string representing the desired symbol/string
-        * :param max_attempts: an int representing the max number of attempts for getting prompt
-        * :param send_interrupt: a bool, true if interrupt is to be sent to trigger prompt, else false
-        * :return: true if prompt is found in serial output, else false
-        */
-        string response;
-
-        for (int attempts = 0; attempts < max_attempts; attempts++) {
-            response.append(serial.read_response());
-            if (response.find(prompt_type) != string::npos) {
-                return true;
-            } else if (send_interrupt && attempts % int_interval == 0) {
-                //std::cout << response << std::endl;
-                std::cout << "send interrupt" << std::endl;
-                serial.send_command(&interrupt_char);
-                //std::cout << "send newline" << std::endl;
-                serial.send_command("\n");
-            }
-            usleep(10);
-        }
+    clear_response();
+    std::cout << "start of passwd" << std::endl;
+    if (get_prompt(PASSWD, 100000, false, 0)) {
+        serial.send_command(temp_pass.c_str());
+    } else {
         return false;
     }
+    clear_response();
+    std::cout << "start of get bash" << std::endl;
+    if (get_prompt(BASH, 100000, false, 0)) {
+        return true;
+    }
+    return false;
+}
 
+bool ConfigManager::configure_wifi() {
+    string connect_cmd = "nmcli device wifi connect " + wifi_network + " password " + wifi_passwd + "\n";
+    string ping_cmd = "ping -c2 8.8.8.8\n";
 
+    if (!get_prompt(BASH, 1000000, true, 1000)) {
+        std::cout << "Unable to configure wifi - no bash prompt found." << std::endl;
+        return false;
+    }
+    clear_response();
+    // attempt to connect
+    serial.send_command(connect_cmd.c_str());
+    if (!get_prompt("successfully activated", 1000000, false, 0)) {
+        return false;
+    }
+    clear_response();
+    // nmcli connection successful - get bash prompt
+    if (!get_prompt(BASH, 100000, false, 0)) {
+        std::cout << "Unable to get bash prompt." << std::endl;
+        return false;
+    }
+    std::cout << "nmcli command complete - bash prompt found" << std::endl;
+    clear_response();
+    // connection presumed successful - get prompt and test with ping
+    if (!get_prompt(BASH, 1000000, true, 1000)) {
+        std::cout << "Unable to get bash prompt for ping test." << std::endl;
+        return false;
+    }
+    std::cout << "Sending ping command" << std::endl;
+    serial.send_command(ping_cmd.c_str());
+    clear_response();
+    if (get_prompt("2 packets transmitted", 10000000, false, 0)) {
+        return true;
+    }
+    return false;
+}
 
+bool ConfigManager::run_apt_update_for_clock_fix() {
+    string update_command = "apt update \n";
 
-};
+    if (!get_prompt(BASH, 1000000, true, 1000)) {
+        std::cout << "Unable to run apt update - no bash prompt found." << std::endl;
+        return false;
+    }
+    clear_response();
+    // attempt to run command
+    serial.send_command(update_command.c_str());
+    if (!get_prompt("Updates for this repository will not be applied.", 100000000, false, 0)) {
+        return false;
+    }
+    std::cout << "Time discrepancy string obtained. Parsing..." << std::endl;
+    time_lag = extractTimeDiscrepancy(response);
+    clear_response();
+    if (time_lag.length() != 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool ConfigManager::send_command(string command) {
+    if (!get_prompt(BASH, 1000000, true, 1000)) {
+        std::cout << "Unable to get bash prompt - no bash prompt found." << std::endl;
+        return false;
+    }
+    // attempt to run command
+    serial.send_command(command.c_str());
+    return true;
+}
+
+bool ConfigManager::fix_clock() {
+    string fix_clock_command = "date -s \"$(date --date='" + time_lag + " seconds' '+%Y-%m-%d %H:%M:%S')\"";
+
+    if (!get_prompt(BASH, 1000000, true, 1000)) {
+        std::cout << "Unable to run clock command - no bash prompt found." << std::endl;
+        return false;
+    }
+    clear_response();
+    // attempt clock fix command
+    serial.send_command(fix_clock_command.c_str());
+    if (!get_prompt(BASH, 10000000, false, 0)) {
+        std::cout << "Unable to get bash prompt after clock command." << std::endl;
+        clear_response();
+        return false;
+    }
+    clear_response();
+    return true;
+}
+
